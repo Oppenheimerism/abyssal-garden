@@ -234,7 +234,7 @@ const FLYN = FLY.length / 6, FLYT = 60, LUTN = 1024, flyLUT = new Float32Array(L
 const flyPts = [];
 // per-frame float state lives in one preallocated array, so the frame loop allocates no heap numbers
 const F = new Float64Array(32), P6 = new Float64Array(6);
-const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24;
+const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24, RSZ = 25;
 // aim the camera from P6 = position + look-at point
 function aim() {
   const dx = P6[3] - P6[0], dy = P6[4] - P6[1], dz = P6[5] - P6[2];
@@ -340,7 +340,7 @@ function resize() {
   const w = max(2, round(DW * s) & ~1), h = max(2, round(DH * s) & ~1);
   if (w === W && h === H) return;
   dynN = dynG = dynGN = 0; dynT = -300; // let the new size settle before measuring again
-  W = w; H = h; canvas.width = W; canvas.height = H;
+  W = w; H = h; canvas.width = W; canvas.height = H; F[RSZ] = performance.now();
   ctx.configure({ device, format: FMT, alphaMode: 'opaque' });
   for (const t of targets) t.destroy();
   const tMS = tex(AA > 1 ? W : 1, H, HDR, TU.RENDER_ATTACHMENT, { samples: AA }), tDp = tex(W, H, DEPTH, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING, { samples: AA });
@@ -535,8 +535,8 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dtr = now - F[LAST]; F[LAST] = now;
   let dt = dtr / 1000; if (dt > 0.1) dt = 0.1;
-  // Dynamic resolution for 60 fps: every second (0.4 s in the first seconds behind the menu) scale the load by k
-  if (dtr < 1e3 && (dynT += dtr) > 0 && (dynN++, dynT > (menu && F[TIME] < 4 ? 400 : 1000))) {
+  // Dynamic resolution for 60 fps: every second (0.4 s in the first seconds, warm-up included) scale the load by k
+  if (dtr < 1e3 && (dynT += dtr) > 0 && (dynN++, dynT > (menu && F[TIME] < 6 ? 400 : 1000))) {
     const a = dynT / dynN, g = dynGN ? dynG / dynGN : 0; let k = 1;
     // with GPU timing: keep it between 9.8 and 13.6 ms
     if (g) { if (g > 13.6 || g < 9.8) k = 11.7 / g; }
@@ -546,7 +546,7 @@ function frame(now) {
     else { dynBad = 0; if (a < 12.5) k = 15 / a; else if (++dynOk > dynWait) { k = 1.17; dynOk = 0; } }
     // every change reallocates the render targets, which hitches: while the camera glides on its own, settle for
     // a size that is roughly right instead of chasing small swings
-    if (auto && F[TIME] > 4 && k > 0.8 && k < 1.4) k = 1;
+    if (auto && F[TIME] > 6 && k > 0.8 && k < 1.4) k = 1;
     k = k < 0.5 ? 0.5 : k > 1.7 ? 1.7 : k; const top = min(PIXMAX, DW * DH), mid = max(top / 2, PIXMIN), was = pix + det;
     // too slow: pixels down to `mid` first, then draw distance, then the remaining pixels; faster goes back the same way
     if (k < 1 ? pix > mid || det <= DETMIN : pix < mid || det >= 1) {
@@ -673,5 +673,15 @@ F[FLT] = 0; flyAt();
 await say('Letting the light in…', 1, 400);
 render(); await Q.onSubmittedWorkDone();
 setTimeout(keep, 15e3, 'abyssalLoad', ''); // the load counts as survived after 15 s of frames
-ui(true);
+// Warm-up: the first seconds stutter while dynamic resolution steps down to what the GPU can hold (every step
+// reallocates the render targets). So the scene runs hidden behind the loading still, the camera held at the
+// still's view, until the size has stopped changing for 0.7 s (at least 1.2 s, at most 3.5 s); then it fades in.
+auto = 0;
 requestAnimationFrame((t) => { F[LAST] = t; requestAnimationFrame(frame); });
+await new Promise((r) => {
+  const t0 = performance.now();
+  const check = () => { const n = performance.now(); if (n - t0 > 3500 || (n - t0 > 1200 && n - F[RSZ] > 700)) r(); else setTimeout(check, 100); };
+  check();
+});
+F[FLT] = 0; auto = 0.3;
+ui(true);
