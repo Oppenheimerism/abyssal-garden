@@ -205,7 +205,7 @@ const POSES = [
 // 60 s camera path (position + look-at, Catmull-Rom): the world generator keeps it clear, dev.js flies along it
 const FLY = new Float32Array([
   10, -42.2, 7, -9, -31, -10,
-  7.5, -41.8, 5.5, -10, -31, -12,
+  7.5, -41.8, 5.5, -14, -33, 19,
   9, -40.5, 18, 17, -37, 42,
   22, -39.2, 40, 48, -36, 45,
   38, -39.2, 46, 57, -27, 18,
@@ -216,7 +216,7 @@ const FLY = new Float32Array([
   30, -30, -70, 4, -28, -90,
   12, -38.5, -62, 6, -27, -90,
   -4, -36.5, -70, 0, -14, -100,
-  -16, -37, -84, 0, -22, -108,
+  -16, -37, -84, -46, -30, -96,
   -29, -38, -90, -44, -34, -60,
   -41, -38, -70, -56, -34, -40,
   -53, -38, -50, -60, -34, -20,
@@ -234,7 +234,7 @@ const FLYN = FLY.length / 6, FLYT = 60, LUTN = 1024, flyLUT = new Float32Array(L
 const flyPts = [];
 // per-frame float state lives in one preallocated array, so the frame loop allocates no heap numbers
 const F = new Float64Array(32), P6 = new Float64Array(6);
-const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24;
+const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24, ASP = 25, SM = 26;
 // aim the camera from P6 = position + look-at point
 function aim() {
   const dx = P6[3] - P6[0], dy = P6[4] - P6[1], dz = P6[5] - P6[2];
@@ -391,7 +391,7 @@ if (hasTS) {
 let hud = false;
 // auto: speed of the camera along the tour path (FLY), 0 when you steer it. It drifts slowly behind the first menu
 // (intro) and at a calmer pace than the benchmark during the tour; the mouse leans the view a little (pmx, pmy).
-let auto = 0.3, intro = true, hinted = false, tour = false, cut = 0, pmx = 0, pmy = 0, pnx = 0, pny = 0;
+let auto = 0.3, intro = true, hinted = false, tour = false, cut = 0, snap = 1, pmx = 0, pmy = 0, pnx = 0, pny = 0;
 let kf = 0, kb = 0, kl = 0, kr = 0, ku = 0, kd = 0, ks = 0, mdx = 0, mdy = 0, lkx = 0, lky = 0, l2x = 0, l2y = 0, hN = 0, hMax = 0, hMin = 1e9, hPer = 1e9, hLate = 0, hTot = 0, tId = -1, tN = 0, tx0 = 0, ty0 = 0, tx = 0, ty = 0;
 const TANH = 0.6, NEAR = 0.1, EXPO = 0.62, RAYS = 0.54;
 const submitList = [null];
@@ -535,8 +535,8 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dtr = now - F[LAST]; F[LAST] = now;
   let dt = dtr / 1000; if (dt > 0.1) dt = 0.1;
-  // Dynamic resolution for 60 fps: every second (0.4 s behind the menu) scale the load by k
-  if (dtr < 1e3 && (dynT += dtr) > 0 && (dynN++, dynT > (menu ? 400 : 1000))) {
+  // Dynamic resolution for 60 fps: every second (0.4 s in the first seconds behind the menu) scale the load by k
+  if (dtr < 1e3 && (dynT += dtr) > 0 && (dynN++, dynT > (menu && F[TIME] < 4 ? 400 : 1000))) {
     const a = dynT / dynN, g = dynGN ? dynG / dynGN : 0; let k = 1;
     // with GPU timing: keep it between 9.8 and 13.6 ms
     if (g) { if (g > 13.6 || g < 9.8) k = 11.7 / g; }
@@ -544,6 +544,9 @@ function frame(now) {
     else if (a > 17.6) { dynOk = 0; if (++dynBad > 1) { k = 15 / a; dynBad = 0; dynWait = min(dynWait * 2, 60); } }
     // at the display's rate there is no telling if there is room, so try a little more now and then
     else { dynBad = 0; if (a < 12.5) k = 15 / a; else if (++dynOk > dynWait) { k = 1.17; dynOk = 0; } }
+    // every change reallocates the render targets, which hitches: while the camera glides on its own, settle for
+    // a size that is roughly right instead of chasing small swings
+    if (auto && F[TIME] > 4 && k > 0.8 && k < 1.4) k = 1;
     k = k < 0.5 ? 0.5 : k > 1.7 ? 1.7 : k; const top = min(PIXMAX, DW * DH), mid = max(top / 2, PIXMIN), was = pix + det;
     // too slow: pixels down to `mid` first, then draw distance, then the remaining pixels; faster goes back the same way
     if (k < 1 ? pix > mid || det <= DETMIN : pix < mid || det >= 1) {
@@ -555,11 +558,29 @@ function frame(now) {
   }
   F[TIME] += dt;
   if (auto) {
+    // The path was made for the benchmark and turns hard in places, so here it is played gently: the camera slows
+    // where the view turns fast (rate in degrees per path second, from 0.1 s ahead), and the view direction goes
+    // through two smoothing stages (F[SM..SM+5]), so what is left of a sharp turn becomes a slow pan
+    const t = F[FLT];
+    F[FLT] = t + 0.1 < FLYT ? t + 0.1 : FLYT; flyAt(); const y1 = F[YAW], p1 = F[PIT];
+    F[FLT] = t; flyAt();
+    let c = cos(F[PIT]) * cos(p1) * cos(F[YAW] - y1) + sin(F[PIT]) * sin(p1); c = c > 1 ? 1 : c < -1 ? -1 : c;
+    const ka = 1 - exp(-dt * 2);
+    F[ASP] += (auto / (1 + acos(c) * 573 / 40) - F[ASP]) * ka;
+    F[FLT] = t + dt * F[ASP];
     // a fade to black just before the end of the path, and back at its start
-    F[FLT] += dt * auto;
-    if (!cut && (FLYT - F[FLT]) / auto < 0.9) { cut = 1; $('v').style.opacity = 1; }
-    if (F[FLT] >= FLYT) { F[FLT] = 0; cut = 0; $('v').style.opacity = 0; }
+    if (!cut && FLYT - F[FLT] < 0.9 * F[ASP]) { cut = 1; $('v').style.opacity = 1; }
+    if (F[FLT] >= FLYT) { F[FLT] = 0; cut = 0; snap = 1; $('v').style.opacity = 0; }
     flyAt();
+    const cp = cos(F[PIT]), dx = sin(F[YAW]) * cp, dy = sin(F[PIT]), dz = -cos(F[YAW]) * cp;
+    if (snap) { snap = 0; F[SM] = F[SM + 3] = dx; F[SM + 1] = F[SM + 4] = dy; F[SM + 2] = F[SM + 5] = dz; F[ASP] = auto; }
+    const kv = 1 - exp(-dt / 0.8);
+    for (let j = 0; j < 6; j += 3) {
+      const ax = j ? F[SM] : dx, ay = j ? F[SM + 1] : dy, az = j ? F[SM + 2] : dz;
+      let x = F[SM + j] + (ax - F[SM + j]) * kv, y = F[SM + j + 1] + (ay - F[SM + j + 1]) * kv, z = F[SM + j + 2] + (az - F[SM + j + 2]) * kv;
+      const l = sqrt(x * x + y * y + z * z); F[SM + j] = x / l; F[SM + j + 1] = y / l; F[SM + j + 2] = z / l;
+    }
+    F[YAW] = atan2(F[SM + 3], -F[SM + 5]); F[PIT] = atan2(F[SM + 4], sqrt(F[SM + 3] * F[SM + 3] + F[SM + 5] * F[SM + 5]));
     const k = 1 - exp(-dt * 1.5); pmx += (pnx - pmx) * k; pmy += (pny - pmy) * k;
     F[YAW] += pmx * 0.12; F[PIT] -= pmy * 0.07;
     F[VX] = F[VY] = F[VZ] = F[MX] = F[MY] = F[MZ] = 0;
@@ -658,8 +679,8 @@ bDive.onclick = go; $('o').onclick = () => ui(true);
 // the tour: from the first menu it carries on from the drift, from elsewhere it cuts back to where it left off
 $('u').onclick = () => {
   sound();
-  if (!auto) { const v = $('v'); v.style.transition = 'none'; v.style.opacity = 1; v.offsetWidth; v.style.transition = ''; v.style.opacity = 0; }
-  intro = false; auto = 0.55; bDive.textContent = 'Resume'; ui(false, true);
+  if (!auto) { snap = 1; const v = $('v'); v.style.transition = 'none'; v.style.opacity = 1; v.offsetWidth; v.style.transition = ''; v.style.opacity = 0; }
+  intro = false; auto = 0.6; bDive.textContent = 'Resume'; ui(false, true);
 };
 // detail buttons: the current level is lit, the others reload the page with theirs
 $('q').querySelectorAll('button').forEach((b, i) => { if (i === 2 - LV) b.className = 'on'; else b.onclick = () => { keep('abyssal', 2 - i); location.reload(); }; });
