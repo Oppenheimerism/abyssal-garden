@@ -30,6 +30,8 @@ if (readable) {
   const css = (_, s) => '<style>' + transformSync(s, { loader: 'css', minify: true }).code.trim();
   html = tpl.replace(/<style>([^]*?)(?=<\/style>)/, css).replace(/>\s+</g, '><').replace('/*SCRIPT*/', () => code).replace(/<script>\s+/, '<script>').replace(/\s+<\/script>/, '</script>');
 }
+// the page states its own size
+html = html.replaceAll('/*KB*/', Math.round(html.length / 1024));
 writeFileSync(path.join(here, '..', out), html);
 const gz = gzipSync(Buffer.from(html), { level: 9 }).length;
 console.log(`${out}: ${(html.length / 1024).toFixed(1)} kB${readable ? ' (readable)' : ''}, ${(gz / 1024).toFixed(1)} kB gzipped`);

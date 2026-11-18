@@ -4,151 +4,222 @@
 <meta charset=utf-8>
 <title>Abyssal Garden</title>
 <meta name=viewport content="width=device-width,initial-scale=1">
-<meta name=theme-color content=#03131c>
+<meta name=theme-color content=#020b10>
+<meta name=description content="A procedural underwater world you can swim through, rendered live in your browser. One /*KB*/ KB file: no images, no models, no sound files.">
+<meta property=og:type content=website>
+<meta property=og:title content="Abyssal Garden">
+<meta property=og:description content="Kelp forests, light rays, a sunken ship and manta rays, all grown from code in one /*KB*/ KB file. Swim through it in your browser.">
+<meta property=og:image content=https://oppenheimerism.github.io/abyssal-garden/media/og.jpg>
+<meta property=og:url content=https://oppenheimerism.github.io/abyssal-garden/>
+<meta name=twitter:card content=summary_large_image>
 <style>
 /* The class on <body> is the state of the page:
-   l = loading, m = menu, g = in the scene (g p while the mouse is captured), l e = failed to start */
-html { background: #03131c; }
+   l = loading, m = menu (m i: the first one, the camera drifting along the tour path behind it),
+   g = in the scene (g p while the mouse is captured, g t during the tour), l e = failed to start */
+:root {
+  --ink: #eef9fb; --dim: #eef9fb9e; --faint: #eef9fb4d; --line: #eef9fb38; --sea: #8fe6ef; --deep: #020b10;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "Noto Serif", Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+html { background: var(--deep); }
 body {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%; margin: 0; overflow: hidden;
-  background: radial-gradient(#0b3a4d, #03131c 70%);
-  font: 700 clamp(13px, .7vw + .9vh, 36px)/1.4 system-ui, sans-serif; color: #e8fbff;
-  -webkit-user-select: none; user-select: none;
+  background: radial-gradient(120% 90% at 30% 110%, #0a2f3d, var(--deep) 70%);
+  font: 400 clamp(13px, .55vw + .75vh, 30px)/1.5 var(--sans); color: var(--ink);
+  -webkit-user-select: none; user-select: none; -webkit-font-smoothing: antialiased;
 }
 /* a phone held upright gets the whole page turned on its side, so the scene is always landscape */
 @media (orientation: portrait) and (pointer: coarse) {
   body { width: 100dvh; height: 100dvw; transform-origin: 0 0; transform: rotate(90deg) translateY(-100%); }
 }
 
-/* the scene: blurred and dimmed behind the menu, comes into focus when you dive */
+/* the scene: sharp behind the first menu, dimmed behind the pause menu */
 canvas {
   position: absolute; width: 100%; height: 100%; touch-action: none; cursor: crosshair;
-  transition: filter 1s, transform 1s, opacity 2s;
+  transition: filter 1.2s, opacity 2.5s cubic-bezier(.4, 0, .2, 1);
 }
-body:not(.g) canvas { filter: blur(1vmax) brightness(.5); transform: scale(1.06); }
+.m canvas { filter: brightness(.45) saturate(.8) blur(.25vmax); }
+.m.i canvas { filter: brightness(.92); }
+.t canvas { cursor: none; }
 .l canvas { opacity: 0; }
+/* black cut when the tour loops or starts from somewhere else */
+#v { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity .8s; }
 
-/* menu: the loading bar and the buttons share one grid cell, so nothing jumps when they swap */
+/* menu: one title card in the lower left over a darkened corner */
 #m {
-  position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: min(2.2em, 6vmin);
-  padding: 1em 1em 4.5em; text-align: center; background: radial-gradient(#03131c00 30%, #03131ccc);
-  transition: opacity .5s, visibility .5s;
+  position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 0 7vmin 8vmin; box-sizing: border-box;
+  background: radial-gradient(140% 120% at 0 100%, #020b10f2 0, #020b10a6 35%, #020b1000 70%),
+    radial-gradient(60% 50% at 100% 100%, #020b10b3, #020b1000),
+    linear-gradient(#020b1066, #020b1000 25%);
+  transition: opacity .7s, visibility .7s;
 }
-.g #m, .m #l, .l #g { opacity: 0; visibility: hidden; }
-h1 {
-  margin: 0; font: 900 4.4em/1 system-ui, sans-serif; letter-spacing: .05em; text-transform: uppercase;
-  color: #0000; background: linear-gradient(#fff 25%, #7ff3ff 60%, #14a9c4);
-  -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 .06em .2em #000c);
-}
-p { margin: 0; }
-#a { display: grid; width: 27em; max-width: 100%; }
-#a > * { grid-area: 1/1; transition: opacity .8s, visibility .8s; }
-#s, #w, #q, #k, #h { font-size: .8em; letter-spacing: .12em; text-transform: uppercase; }
-#w { margin-top: 1.2em; color: #7ff3ff; text-wrap: balance; }
+.g #m { opacity: 0; visibility: hidden; }
+#m > * { animation: rise 1.4s cubic-bezier(.2, .7, .2, 1) backwards; }
+@keyframes rise { from { opacity: 0; transform: translateY(1.2em); } }
+#m > :nth-child(2) { animation-delay: .12s; } #m > :nth-child(3) { animation-delay: .24s; } #m > :nth-child(4) { animation-delay: .36s; }
 
-/* loading bar */
-#p {
-  height: .5em; margin: .4em 0 1em; overflow: hidden; border-radius: 1em; background: #03131c;
-  box-shadow: 0 0 0 2px #7ff3ff80, 0 0 1.5em #14a9c4;
+#e {
+  margin: 0 0 1.4em; font-size: .72em; font-weight: 600; letter-spacing: .32em; text-transform: uppercase; color: var(--sea);
+  display: flex; align-items: center; gap: 1.2em;
 }
+#e::before { content: ''; width: 3.2em; height: 1px; background: currentColor; opacity: .7; }
+h1 {
+  margin: 0 0 .32em -.04em; font: 400 min(5.6em, 13vmin)/.95 var(--serif); letter-spacing: -.01em;
+  text-shadow: 0 0 .5em #8fe6ef40, 0 .05em .3em #0008;
+}
+h1 em { font-style: italic; color: #d6f6fa; }
+p { margin: 0; }
+#r { max-width: 31em; margin-bottom: 2.6em; font: italic 1.12em/1.55 var(--serif); color: var(--dim); text-wrap: pretty; }
+
+/* the loading line and the buttons share one grid cell, so nothing jumps when they swap */
+#a { display: grid; width: min(36em, 100%); }
+#a > * { grid-area: 1/1; transition: opacity .8s, visibility .8s; }
+.m #l, .l #g { opacity: 0; visibility: hidden; }
+
+/* loading: a hairline that fills on the compositor, the current stage and how deep the dive has got */
+#l { align-self: start; }
+#p { position: relative; height: 1px; margin: 1.1em 0 .9em; background: var(--line); }
 #b {
-  display: block; height: 100%; background: linear-gradient(90deg, #14a9c4, #9ff6ff);
-  transform: scaleX(0); transform-origin: 0; will-change: transform;
+  position: absolute; inset: 0; background: linear-gradient(90deg, #8fe6ef00, var(--sea) 70%, #fff);
+  box-shadow: 0 0 .8em var(--sea); transform: scaleX(0); transform-origin: 0; will-change: transform;
 }
-.e #p { visibility: hidden; }
-.e #s { font-size: 1.1em; letter-spacing: 0; text-transform: none; }
+#s { display: flex; justify-content: space-between; gap: 2em; font-size: .78em; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+#s::after { content: attr(data-d); text-transform: none; font-variant-numeric: tabular-nums; color: var(--sea); }
+#w { margin-top: 1em; font-size: .78em; color: var(--faint); }
+.e #p, .e #s::after { display: none; }
+.e #s { display: block; max-width: 30em; font-size: 1.05em; letter-spacing: 0; text-transform: none; color: var(--ink); }
 
 /* buttons */
-button, a {
-  display: flex; align-items: center; justify-content: center; gap: .6em; padding: .8em 1.4em; border: 0;
-  border-radius: .5em; background: #fff; box-shadow: inset 0 -.2em #0003, 0 .3em 1em #0009;
-  font: 800 1em/1.2 system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; text-decoration: none;
-  color: #03222d; cursor: pointer; transition: transform .12s, filter .12s;
+button, a { font: inherit; color: inherit; text-decoration: none; cursor: pointer; }
+button { border: 0; background: none; padding: 0; }
+:focus-visible { outline: 1px solid var(--sea); outline-offset: .35em; }
+#g { display: flex; flex-wrap: wrap; align-items: center; gap: 1.2em 2.4em; }
+#d, #y {
+  display: inline-flex; align-items: center; gap: 1em; padding: 1em 1.9em 1em 2.1em; border-radius: 10em;
+  background: #eef9fb14; box-shadow: inset 0 0 0 1px #eef9fb59, 0 .6em 2em #0005;
+  -webkit-backdrop-filter: blur(12px) saturate(1.4); backdrop-filter: blur(12px) saturate(1.4);
+  font-size: .82em; font-weight: 600; letter-spacing: .26em; text-transform: uppercase;
+  transition: background .35s, box-shadow .35s, color .35s;
 }
-button:hover, a:hover { transform: translateY(-.12em); filter: brightness(1.15); }
-button:active, a:active { transform: translateY(.1em); filter: brightness(.9); }
-:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
-#g { display: grid; gap: min(1.2em, 3.5vmin); }
-#d {
-  padding: .9em; background: linear-gradient(#9ff6ff, #19c3d6); font-size: 1.3em;
-  box-shadow: inset 0 -.2em #0003, 0 0 2em #19c3d6b3;
+#d::after, #y::after { content: '→'; font-size: 1.25em; letter-spacing: 0; transition: transform .35s cubic-bezier(.2, .7, .2, 1); }
+#d:hover, #y:hover { background: var(--ink); color: var(--deep); box-shadow: inset 0 0 0 1px var(--ink), 0 0 2.5em #8fe6ef66; }
+#d:hover::after, #y:hover::after { transform: translateX(.3em); }
+#u { display: inline-flex; align-items: center; gap: .8em; font-size: .82em; letter-spacing: .2em; text-transform: uppercase; color: var(--dim); transition: color .3s; }
+#u svg { width: 2.4em; height: 2.4em; fill: none; stroke: currentColor; stroke-width: 1; }
+#u svg path { fill: currentColor; stroke: none; }
+#u:hover { color: var(--ink); }
+
+/* detail level: three words, the current one underlined; the others reload the page */
+#q { display: flex; align-items: center; gap: 1.3em; width: 100%; margin-top: .6em; font-size: .72em; letter-spacing: .2em; text-transform: uppercase; color: var(--faint); }
+#q button { padding: .3em 0; color: var(--dim); letter-spacing: inherit; text-transform: inherit; transition: color .3s; }
+#q button:hover { color: var(--ink); }
+#q .on { color: var(--ink); box-shadow: inset 0 -1px var(--sea); pointer-events: none; }
+
+/* credit and the list of controls: lower right */
+#f {
+  position: absolute; right: 7vmin; bottom: 8vmin; display: flex; flex-direction: column; align-items: flex-end; gap: 2em;
+  font-size: .74em; letter-spacing: .08em; color: var(--dim); text-align: right; text-shadow: 0 1px .6em #000c;
 }
-
-/* GitHub and Ko-fi: always at the bottom of the menu, in their own colours */
-#f { position: absolute; left: 0; right: 0; bottom: 1.5em; display: flex; justify-content: center; gap: 1em; font-size: .8em; }
-a + a { background: #ff5e5b; color: #fff; }
-svg { width: 1.5em; height: 1.5em; fill: currentColor; }
-
-/* dark plates under the dive button: detail level, list of controls, touch hint */
-#q, #k, #h { padding: 1em 1.6em; border-radius: .7em; background: #03131cb3; }
-
-/* detail level: three buttons in a row, the current one lit */
-#q { display: flex; align-items: center; gap: .4em; padding: .4em; }
-#q span { flex: 1; color: #7ff3ff; }
-#q button { flex: 1.2; padding: .7em 0; background: none; box-shadow: none; color: #e8fbff; }
-#q button:hover { background: #7ff3ff33; }
-#q .on { background: linear-gradient(#9ff6ff, #19c3d6); box-shadow: inset 0 -.2em #0003; color: #03222d; pointer-events: none; }
-
-/* list of controls: two groups, key caps right-aligned against their labels */
-#k { display: flex; justify-content: center; gap: 2em; text-align: left; }
-#k p { display: grid; grid-template-columns: auto auto; align-content: start; align-items: center; gap: .55em .9em; }
-#k p + p { padding-left: 2em; border-left: 2px solid #7ff3ff40; }
-#k i { display: flex; justify-self: end; align-items: center; gap: .25em; font-style: normal; }
+#f a { color: var(--dim); transition: color .3s; }
+#f a:hover { color: var(--ink); }
+#k { display: grid; grid-template-columns: auto auto; gap: .55em 1.1em; align-items: center; color: var(--dim); }
+#k i { justify-self: end; display: flex; gap: .3em; font-style: normal; }
 #k b {
-  min-width: 1.1em; padding: .2em .5em; border-radius: .35em; background: #e8fbff;
-  box-shadow: inset 0 -.15em #0004; color: #03222d; text-align: center;
+  min-width: 1.7em; padding: .1em .45em; border-radius: .3em; box-shadow: inset 0 0 0 1px var(--line);
+  font-weight: 500; font-size: .92em; color: var(--ink); text-align: center; box-sizing: border-box;
 }
+.i #k, .l #k { display: none; }
 #h { display: none; }
-@media (pointer: coarse), (max-height: 30em) {
-  #k { display: none; }
-}
-@media (pointer: coarse) {
-  #h { display: block; }
-}
+@media (pointer: coarse), (max-height: 30em) { #k { display: none !important; } }
+@media (pointer: coarse) { .m:not(.i) #h { display: block; } }
+@media (max-width: 52em) { #f { display: none; } }
 
-/* in the scene: a small menu button (hidden while the mouse is captured, Esc does the same) and the stats line */
-#o {
-  position: absolute; top: .6em; right: .6em; display: none; padding: .3em .6em; background: #03222dd9;
-  box-shadow: inset 0 0 0 2px #7ff3ff, 0 .3em 1em #0009; font-size: 1.3em; color: #e8fbff; opacity: .8;
+/* in the scene: the first-time hint, a small menu button and the stats line */
+#t {
+  position: absolute; left: 50%; bottom: 6vmin; padding: .8em 1.6em; border-radius: 10em; opacity: 0; translate: -50%;
+  background: #020b1080; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  font-size: .78em; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; color: var(--dim); pointer-events: none;
 }
-.g #o { display: flex; }
-.p #o { display: none; }
+#t.on { animation: hint 8s 1s; }
+@keyframes hint { 10%, 85% { opacity: 1; } }
+.m #t, .t #t { visibility: hidden; }
+#t span + span, #c2 span + span { display: none; }
+@media (pointer: coarse) { #t span, #c2 span { display: none; } #t span + span, #c2 span + span { display: inline; } }
+
+#o {
+  position: absolute; top: 1em; right: 1em; display: none; width: 2.4em; height: 2.4em; border-radius: 50%;
+  background: #020b1066; box-shadow: inset 0 0 0 1px var(--line); font-size: 1.2em; opacity: .85;
+}
+.g #o { display: block; }
+.p #o, .t #o { display: none; }
 #i {
   position: absolute; top: 1em; left: 1.2em; margin: 0; font: .8em/1.6 ui-monospace, Consolas, monospace;
   white-space: pre-wrap; text-shadow: 0 1px 4px #000; pointer-events: none;
 }
+
+/* the tour: letterbox bars and a line saying how to take over */
+#x { position: absolute; inset: 0; pointer-events: none; }
+#x::before, #x::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 10vmin; background: #000;
+  transform: scaleY(0); transition: transform 1.2s cubic-bezier(.6, 0, .2, 1);
+}
+#x::before { top: 0; transform-origin: top; } #x::after { bottom: 0; transform-origin: bottom; }
+.t #x::before, .t #x::after { transform: none; }
+#c2 {
+  position: absolute; left: 0; right: 0; bottom: 3.6vmin; text-align: center; font-size: .72em; letter-spacing: .24em;
+  text-transform: uppercase; color: var(--faint); opacity: 0; transition: opacity 1s .6s; z-index: 1;
+}
+.t #c2 { opacity: 1; }
+
+/* no WebGPU (or a failed start): stills of the scene drifting behind the message */
+#z { position: absolute; inset: 0; display: none; overflow: hidden; }
+.e #z { display: block; }
+#z i { position: absolute; inset: -4%; background: center / cover; opacity: 0; animation: still 30s infinite; }
+.e #z i:nth-child(1) { background-image: url(media/whale-fluke.jpg); }
+.e #z i:nth-child(2) { background-image: url(media/shipwreck.jpg); animation-delay: 6s; }
+.e #z i:nth-child(3) { background-image: url(media/kelp-forest.jpg); animation-delay: 12s; }
+.e #z i:nth-child(4) { background-image: url(media/purple-grotto.jpg); animation-delay: 18s; }
+.e #z i:nth-child(5) { background-image: url(media/light-rays.jpg); animation-delay: 24s; }
+@keyframes still { 0% { opacity: 0; transform: scale(1); } 5%, 20% { opacity: 1; } 25%, 100% { opacity: 0; transform: scale(1.08); } }
+#y { display: none; margin-top: 1.6em; padding-right: 2.1em; }
+#y::after { display: none; }
+.e #y { display: inline-flex; }
+.e #w { display: none; }
 </style>
 </head>
 <body class=l>
+<div id=z><i></i><i></i><i></i><i></i><i></i></div>
 <canvas id=c></canvas>
+<i id=v></i>
+<div id=x><p id=c2><span>Move the mouse and click, or press W, to take over · Esc for the menu</span><span>Touch to take over</span></p></div>
 <div id=m>
-  <h1>Abyssal Garden</h1>
+  <p id=e>A procedural ocean</p>
+  <h1>Abyssal <em>Garden</em></h1>
+  <p id=r>Kelp forests, light pouring through a rippling surface, a sunken ship, manta rays overhead. All of it is grown from code as the page loads: one /*KB*/&nbsp;KB file, no images, no models, no sound files.</p>
   <div id=a>
-    <div id=l><div id=p><i id=b></i></div><p id=s>Diving…</p><p id=w hidden>Use Google Chrome for optimal experience</p></div>
+    <div id=l><div id=p><i id=b></i></div><p id=s data-d="0 m">Descending…</p><p id=w hidden>Best in Chrome or Edge on a computer</p>
+      <button id=y onclick="navigator.clipboard.writeText(location.href).then(()=>this.firstChild.textContent='Link copied')">Copy link</button></div>
     <div id=g>
       <button id=d>Dive in</button>
-      <p id=q><span>Detail</span><button>Low</button><button>Medium</button><button>High</button></p>
-      <div id=k>
-        <p>
-          <i><b>W</b><b>A</b><b>S</b><b>D</b></i>Swim
-          <i><b>Q</b><b>E</b></i>Down / up
-          <i><b>Shift</b></i>Faster
-          <i><b>1</b>–<b>6</b></i>Viewpoints
-        </p>
-        <p>
-          <i><b>Esc</b></i>Menu
-          <i><b>M</b></i>Mute
-          <i><b>H</b></i>Stats
-        </p>
-      </div>
-      <p id=h>Hold to swim forward · slide to steer · second finger to go faster</p>
+      <button id=u><svg viewBox="0 0 24 24"><circle cx=12 cy=12 r=11.5 /><path d="M10 8.2v7.6l6-3.8z"/></svg>Watch the tour</button>
+      <p id=h>Hold to swim · slide to steer · second finger for speed</p>
+      <p id=q>Detail <button>Low</button><button>Medium</button><button>High</button></p>
     </div>
   </div>
-  <p id=f>
-    <a href=https://github.com/Noniv/abyssal-garden target=_blank><svg viewBox="0 0 16 16"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>GitHub</a>
-    <a href=https://ko-fi.com/noniv target=_blank><svg viewBox="0 0 24 24"><path fill-rule=evenodd d="M2 5h16.5a4.5 4.5 0 0 1 0 9H17a6 6 0 0 1-6 5H8a6 6 0 0 1-6-6zM17 8v3h1.5a1.5 1.5 0 0 0 0-3zM9.5 15.5 5.9 12a2.2 2.2 0 0 1 3.6-2.5 2.2 2.2 0 0 1 3.6 2.5z"/></svg>Support</a>
-  </p>
+  <div id=f>
+    <div id=k>
+      <i><b>W</b><b>A</b><b>S</b><b>D</b></i>Swim
+      <i><b>Q</b><b>E</b></i>Down / up
+      <i><b>Shift</b></i>Faster
+      <i><b>1</b><b>6</b></i>Viewpoints
+      <i><b>M</b></i>Sound
+      <i><b>H</b></i>Stats
+    </div>
+    <p>Created by <a href=https://github.com/Noniv/abyssal-garden target=_blank rel=noopener>Noniv</a> · <a href=https://ko-fi.com/noniv target=_blank rel=noopener>Support the author</a></p>
+  </div>
 </div>
+<p id=t><span>W A S D swim · mouse to look · Q / E down, up · Shift faster · Esc menu</span><span>Hold to swim · slide to steer · ≡ for the menu</span></p>
 <button id=o aria-label=Menu>≡</button>
 <pre id=i></pre>
 <script>

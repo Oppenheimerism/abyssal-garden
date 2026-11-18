@@ -9,16 +9,16 @@ const rot = matchMedia('(orientation:portrait) and (pointer:coarse)');
 // thread is busy
 let loaded = 0, dead; // dead: the graphics device was lost
 const say = (m, to, ms) => {
-  if (!dead) $('s').textContent = m;
+  if (!dead) { $('s').textContent = m; $('s').dataset.d = round(to * 42) + ' m'; }
   const a = $('b').animate({ transform: [`scaleX(${loaded})`, `scaleX(${to})`] }, { duration: ms, fill: 'forwards', easing: 'cubic-bezier(.3,.5,.5,1)' });
   loaded = to;
   // go on once the animation runs: one not started before the thread gets busy stays stuck (timer: hidden tabs)
   return new Promise((r) => { a.ready.then(() => setTimeout(r)); setTimeout(r, document.hidden ? 0 : 1e3); });
 };
 const fail = (m) => { throw new Error(m, { cause: 1 }); }; // cause marks a message that is shown as it is
-if (!navigator.gpu) fail('This scene needs WebGPU. Try a current Chrome or Edge.');
+if (!navigator.gpu) fail('This ocean is drawn live on your graphics card with WebGPU, which this browser doesn’t offer yet. Open the link in Chrome or Edge on a computer to dive in.');
 const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-if (!adapter) fail('No WebGPU adapter found.');
+if (!adapter) fail('This browser has WebGPU, but it found no graphics card to use. Open the link in Chrome or Edge on a computer to dive in.');
 $('w').hidden = !!navigator.userAgentData; // only Chromium-based browsers have it
 const hasTS = adapter.features.has('timestamp-query');
 const device = await adapter.requestDevice({ requiredFeatures: hasTS ? ['timestamp-query'] : [] });
@@ -389,6 +389,9 @@ if (hasTS) {
 
 // ---------------------------------------------------------------- frame
 let hud = false;
+// auto: speed of the camera along the tour path (FLY), 0 when you steer it. It drifts slowly behind the first menu
+// (intro) and at a calmer pace than the benchmark during the tour; the mouse leans the view a little (pmx, pmy).
+let auto = 0.3, intro = true, hinted = false, tour = false, cut = 0, pmx = 0, pmy = 0, pnx = 0, pny = 0;
 let kf = 0, kb = 0, kl = 0, kr = 0, ku = 0, kd = 0, ks = 0, mdx = 0, mdy = 0, lkx = 0, lky = 0, l2x = 0, l2y = 0, hN = 0, hMax = 0, hMin = 1e9, hPer = 1e9, hLate = 0, hTot = 0, tId = -1, tN = 0, tx0 = 0, ty0 = 0, tx = 0, ty = 0;
 const TANH = 0.6, NEAR = 0.1, EXPO = 0.62, RAYS = 0.54;
 const submitList = [null];
@@ -551,7 +554,16 @@ function frame(now) {
     dynN = dynT = dynG = dynGN = 0; resize();
   }
   F[TIME] += dt;
-  {
+  if (auto) {
+    // a fade to black just before the end of the path, and back at its start
+    F[FLT] += dt * auto;
+    if (!cut && (FLYT - F[FLT]) / auto < 0.9) { cut = 1; $('v').style.opacity = 1; }
+    if (F[FLT] >= FLYT) { F[FLT] = 0; cut = 0; $('v').style.opacity = 0; }
+    flyAt();
+    const k = 1 - exp(-dt * 1.5); pmx += (pnx - pmx) * k; pmy += (pny - pmy) * k;
+    F[YAW] += pmx * 0.12; F[PIT] -= pmy * 0.07;
+    F[VX] = F[VY] = F[VZ] = F[MX] = F[MY] = F[MZ] = 0;
+  } else {
     // touch: holding the finger away from where it went down keeps turning, like a joystick
     if (tId >= 0) {
       const tr = 4 / (innerWidth < innerHeight ? innerWidth : innerHeight); let jx = (tx - tx0) * tr, jy = (ty - ty0) * tr;
@@ -593,15 +605,22 @@ const key = (e, v) => {
   }
 };
 // behind the menu only the stats and mute keys work
-addEventListener('keydown', (e) => { if (menu && e.code !== 'KeyH' && e.code !== 'KeyM') return; sound(); key(e, 1); });
+addEventListener('keydown', (e) => {
+  if (menu && e.code !== 'KeyH' && e.code !== 'KeyM') return;
+  if (tour && /^(Key[WASDQE]|Shift|Arrow)/.test(e.code)) take();
+  sound(); key(e, 1);
+});
 addEventListener('keyup', (e) => key(e, 0));
 const release = () => { kf = kb = kl = kr = ku = kd = ks = 0; tId = -1; tN = 0; };
 const capture = () => { sound(); const p = canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(() => canvas.requestPointerLock()).catch(() => 0); };
 canvas.addEventListener('click', capture);
-addEventListener('mousemove', (e) => { if (document.pointerLockElement === canvas) { mdx += e.movementX; mdy += e.movementY; } });
+addEventListener('mousemove', (e) => {
+  if (document.pointerLockElement === canvas) { mdx += e.movementX; mdy += e.movementY; }
+  else { pnx = e.clientX / innerWidth * 2 - 1; pny = e.clientY / innerHeight * 2 - 1; }
+});
 addEventListener('blur', release);
 const touch = (e) => {
-  e.preventDefault(); sound(); tN = e.touches.length;
+  e.preventDefault(); sound(); if (tour) take(); tN = e.touches.length;
   let f = null, first = false; for (let i = 0; i < tN; i++) if (e.touches[i].identifier === tId) f = e.touches[i];
   if (!f) { tId = -1; if (tN) { f = e.touches[0]; tId = f.identifier; first = true; } }
   if (f) {
@@ -617,25 +636,37 @@ for (const n of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) canvas.a
 // The scene keeps rendering (blurred by CSS) behind the menu. Esc, losing the mouse or the corner button open it.
 let menu = true;
 const bDive = $('d');
-const ui = (m) => {
+const ui = (m, t) => {
   if (dead) return;
-  menu = m; body.className = m ? 'm' : document.pointerLockElement ? 'g p' : 'g';
+  menu = m; tour = !!t;
+  if (!t && !(m && intro)) auto = 0; // only the first menu and the tour keep the camera on the path
+  body.className = m ? (intro ? 'm i' : 'm') : t ? 'g t' : document.pointerLockElement ? 'g p' : 'g';
   // focus the dive button so Enter works (delayed: it can't take focus while still hidden)
   if (m) { release(); setTimeout(() => menu && bDive.focus(), 100); } else document.activeElement.blur();
 };
+// the hint at the bottom shows the first time you take the camera
+const first = () => { intro = false; if (!hinted) { hinted = true; $('t').className = 'on'; } bDive.textContent = 'Resume'; };
+// leave the tour where it is and steer from there
+const take = () => { auto = 0; first(); ui(false); };
 const go = () => {
-  sound(); ui(false); bDive.textContent = 'Resume';
+  sound(); first(); ui(false);
   // phones: go fullscreen and ask for landscape; where that is refused the CSS rotation still applies
   if (mob) document.documentElement.requestFullscreen?.()?.then(() => screen.orientation.lock('landscape')).catch(() => 0);
   if (!mob) capture();
 };
 bDive.onclick = go; $('o').onclick = () => ui(true);
+// the tour: from the first menu it carries on from the drift, from elsewhere it cuts back to where it left off
+$('u').onclick = () => {
+  sound();
+  if (!auto) { const v = $('v'); v.style.transition = 'none'; v.style.opacity = 1; v.offsetWidth; v.style.transition = ''; v.style.opacity = 0; }
+  intro = false; auto = 0.55; bDive.textContent = 'Resume'; ui(false, true);
+};
 // detail buttons: the current level is lit, the others reload the page with theirs
 $('q').querySelectorAll('button').forEach((b, i) => { if (i === 2 - LV) b.className = 'on'; else b.onclick = () => { keep('abyssal', 2 - i); location.reload(); }; });
-document.addEventListener('pointerlockchange', () => ui(!document.pointerLockElement));
+document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement) take(); else ui(true); });
 
 // draw the first frame and wait for the GPU to finish it (pipelines get compiled on first use) before the reveal
-lookAt(...POSES[0]);
+F[FLT] = 0; flyAt();
 await say('Letting the light in…', 1, 400);
 render(); await Q.onSubmittedWorkDone();
 setTimeout(keep, 15e3, 'abyssalLoad', ''); // the load counts as survived after 15 s of frames

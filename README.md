@@ -2,6 +2,10 @@
 
 **A dreamy underwater world you can swim through, right in your browser.**
 
+> **About this fork:** a quieter, cinematic title screen. The live scene drifts along the tour path behind a serif title card, **Watch the tour** flies the camera through the whole world for you, loading shows how deep the dive has got, and browsers without WebGPU get stills of the scene instead of an error.
+> **Live: https://oppenheimerism.github.io/abyssal-garden/**
+> The world itself, and all the credit for it, belongs to the original by [Noniv](https://github.com/Noniv/abyssal-garden).
+
 Towering kelp forests, sunbeams pouring through a rippling surface, a sunken ship, manta rays gliding overhead.
 And all of it is made by code: no images, no 3D models, no sound files. The whole world fits in **one 96 KB HTML file**.
 
