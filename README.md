@@ -2,22 +2,34 @@
 
 **A dreamy underwater world you can swim through, right in your browser.**
 
-> **About this fork:** a quieter, cinematic title screen. The live scene drifts along the tour path behind a serif title card, **Watch the tour** flies the camera through the whole world for you, loading shows how deep the dive has got, and browsers without WebGPU get stills of the scene instead of an error.
-> **Live: https://oppenheimerism.github.io/abyssal-garden/**
-> The world itself, and all the credit for it, belongs to the original by [Noniv](https://github.com/Noniv/abyssal-garden).
+### ▶ [Dive in: oppenheimerism.github.io/abyssal-garden](https://oppenheimerism.github.io/abyssal-garden/)
+
+Redesigned by **Kelvin** ([@Oppenheimerism](https://github.com/Oppenheimerism)) · original world by **[Noniv](https://github.com/Noniv/abyssal-garden)**
 
 Towering kelp forests, sunbeams pouring through a rippling surface, a sunken ship, manta rays gliding overhead.
-And all of it is made by code: no images, no 3D models, no sound files. The whole world fits in **one 96 KB HTML file**.
+And all of it is made by code: no images, no 3D models, no sound files. The whole world fits in **one HTML file of about 100 KB**.
 
 ![Kelp forest with a stone whale tail and a manta ray](.github/screenshots/whale-fluke.jpg)
 
 ## Try it
 
-1. Download [`index.html`](index.html).
-2. Open it in **Chrome** or **Edge** on a desktop computer.
-3. Wait a few seconds while the world is built, then press **Dive in** and start swimming.
+1. Open **[the live page](https://oppenheimerism.github.io/abyssal-garden/)** in **Chrome** or **Edge** on a computer.
+2. Wait a few seconds while the world is built (the bar shows how deep you've dived).
+3. Press **Dive in** to swim yourself, or **Watch the tour** to let the camera glide through the whole world. During the tour, press `W`, click or touch the screen to take over from wherever you are.
 
-Nothing to install, and it works offline. It needs a browser with **WebGPU**. If you see *"This scene needs WebGPU"*, update your browser or switch to Chrome / Edge.
+It needs a browser with **WebGPU**. Without it, the page shows stills of the scene and a button to copy the link, so you can open it on a computer later.
+
+Prefer it offline? Download [`index.html`](index.html) and open it: nothing to install.
+
+## What's new in this version
+
+The world itself is Noniv's. This version reworks what's around it:
+
+- **A cinematic title screen**: the live scene, sharp instead of blurred, slowly drifting along the tour path behind a serif title card
+- **Watch the tour**: a letterboxed autopilot through the whole world that loops; any key, click or touch hands you the camera
+- **A dive-depth loading line** instead of a progress bar
+- **A friendlier start without WebGPU**: stills of the scene instead of an error message
+- **Link previews**: a preview image and description when the link is shared
 
 ## What's down there
 
@@ -108,3 +120,4 @@ Some easy first tweaks:
 ## License
 
 [MIT](LICENSE): free to use, change and share, including in your own projects.
+The original world is © 2026 Maksymilian Dendura ([Noniv](https://github.com/Noniv/abyssal-garden)); the redesigned title screen and tour are by Kelvin. Keep the [LICENSE](LICENSE) file with any copy.
